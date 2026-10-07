@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Signals & Systems Lab</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- KaTeX for equation rendering -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .math-input-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 1px #ef4444 !important;
+        }
+        .katex-display {
+            margin: 0 !important;
+            padding: 0.5rem 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-slate-900 text-white shadow-lg p-3 flex justify-between items-center z-10 shrink-0 border-b border-slate-700">
+        <div class="flex items-center gap-3 pl-2">
+            <div class="bg-blue-500 p-2 rounded-lg text-white">
+                <i class="fas fa-wave-square text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Signals & Systems Lab</h1>
+                <p class="text-xs text-slate-400">Advanced Mathematical Parser Edition</p>
+            </div>
+        </div>
+        <div class="flex gap-2 bg-slate-800 p-1 rounded-lg">
+            <button id="tab-btn-fourier" class="px-5 py-2 rounded-md bg-blue-500 text-white font-semibold transition-all duration-200 shadow-sm" onclick="switchTab('fourier')">
+                <i class="fas fa-chart-line mr-2"></i>Fourier Analysis
+            </button>
+            <button id="tab-btn-conv" class="px-5 py-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 font-semibold transition-all duration-200" onclick="switchTab('conv')">
+                <i class="fas fa-layer-group mr-2"></i>Convolution
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden">
+        
+        <!-- ========================================== -->
+        <!-- TAB 1: FOURIER ANALYSIS                    -->
+        <!-- ========================================== -->
+        <div id="tab-fourier" class="absolute inset-0 w-full h-full flex flex-col md:flex-row p-4 gap-4 overflow-y-auto">
+            
+            <!-- Left Panel: Signal Definition -->
+            <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-4 shrink-0">
+                <div class="glass-panel rounded-xl flex flex-col overflow-hidden shadow-sm">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                        <h2 class="text-lg font-bold text-slate-800"><i class="fas fa-calculator text-blue-500 mr-2"></i>Signal Builder</h2>
+                    </div>
+                    
+                    <div class="p-4 space-y-4">
+                        <!-- Presets -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Presets</label>
+                            <select id="fourier-preset" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5" onchange="loadFourierPreset()">
+                                <option value="exp(-t) * sin(5*t) * u(t)">Damped Sine: exp(-t)*sin(5*t)*u(t)</option>
+                                <option value="u(t+2) - u(t-2)">Rectangular Pulse: u(t+2) - u(t-2)</option>
+                                <option value="r(t) - 2*r(t-2) + r(t-4)">Triangle: r(t) - 2r(t-2) + r(t-4)</option>
+                                <option value="sin(2*pi*t) + 0.5*sin(6*pi*t)">Harmonics: sin(2πt) + 0.5sin(6πt)</option>
+                                <option value="exp(-abs(t))">Two-sided Exp: exp(-abs(t))</option>
+                                <option value="custom">Custom Input...</option>
+                            </select>
+                        </div>
+
+                        <!-- Mathematical Input -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Expression x(t)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 font-mono">x(t) =</span>
+                                <input type="text" id="fourier-input" class="w-full bg-white border border-slate-300 text-slate-900 text-sm font-mono rounded-lg focus:ring-blue-500 focus:border-blue-500 block pl-14 p-2.5 transition-colors" value="exp(-t) * sin(5*t) * u(t)" oninput="handleFourierInputChange()">
+                            </div>
+                            <p id="fourier-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                            
+                            <div class="mt-2 text-xs text-slate-500 leading-tight">
+                                <strong>Available functions:</strong> u(t), r(t), delta(t), rect(t), sin(), cos(), exp(), abs(), pi.
+                            </div>
+                        </div>
+
+                        <!-- Rendered Math Output -->
+                        <div class="mt-4 pt-4 border-t border-slate-100">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Interpreted Expression</label>
+                            <div id="fourier-math-display" class="w-full min-h-[60px] bg-slate-50 rounded-lg flex items-center justify-center p-2 border border-slate-200 text-slate-800">
+                                <!-- KaTeX rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Charts -->
+            <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-4 overflow-y-auto">
+                <!-- Time Domain Plot -->
+                <div class="glass-panel rounded-xl p-3 flex-1 min-h-[300px] flex flex-col shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 px-2"><i class="far fa-clock text-blue-500 mr-2"></i>Time Domain: x(t)</h3>
+                    <div id="plot-fourier-time" class="w-full flex-1"></div>
+                </div>
+                
+                <!-- Frequency Domain Plots -->
+                <div class="flex flex-col xl:flex-row gap-4 flex-1 min-h-[300px]">
+                    <div class="glass-panel rounded-xl p-3 flex-1 flex flex-col w-full xl:w-1/2 shadow-sm">
+                        <h3 class="text-sm font-bold text-slate-700 mb-1 px-2"><i class="fas fa-chart-bar text-emerald-500 mr-2"></i>Magnitude Spectrum |X(f)|</h3>
+                        <div id="plot-fourier-mag" class="w-full flex-1"></div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-3 flex-1 flex flex-col w-full xl:w-1/2 shadow-sm">
+                        <h3 class="text-sm font-bold text-slate-700 mb-1 px-2"><i class="fas fa-project-diagram text-purple-500 mr-2"></i>Phase Spectrum ∠X(f)</h3>
+                        <div id="plot-fourier-phase" class="w-full flex-1"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CONVOLUTION ANIMATION               -->
+        <!-- ========================================== -->
+        <div id="tab-conv" class="absolute inset-0 w-full h-full flex flex-col p-4 gap-4 hidden overflow-y-auto">
+            
+            <!-- Controls Panel -->
+            <div class="glass-panel rounded-xl p-4 flex flex-col lg:flex-row gap-6 shrink-0 z-10 shadow-sm">
+                
+                <div class="flex-1 flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800"><i class="fas fa-exchange-alt text-blue-500 mr-2"></i>Convolution Setup</h3>
+                        <select id="conv-preset" class="bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5" onchange="loadConvPreset()">
+                            <option value="pulse_pulse">Pulse * Pulse</option>
+                            <option value="exp_step">Exp * Step</option>
+                            <option value="step_exp">Step * Exp</option>
+                            <option value="sine_pulse">Sine * Pulse</option>
+                            <option value="custom">Custom Input...</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- x(t) Input -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Signal x(t) [Fixed]</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-500 font-mono font-bold">x(t)=</span>
+                                <input type="text" id="conv-x-input" class="w-full bg-white border border-slate-300 text-slate-900 text-sm font-mono rounded-lg focus:ring-blue-500 focus:border-blue-500 block pl-14 p-2 transition-colors" value="rect(t/2)" oninput="handleConvInputChange()">
+                            </div>
+                            <p id="conv-x-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                        </div>
+                        
+                        <!-- h(t) Input -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Impulse Response h(t) [Moving]</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-red-500 font-mono font-bold">h(t)=</span>
+                                <input type="text" id="conv-h-input" class="w-full bg-white border border-slate-300 text-slate-900 text-sm font-mono rounded-lg focus:ring-red-500 focus:border-red-500 block pl-14 p-2 transition-colors" value="rect(t/2)" oninput="handleConvInputChange()">
+                            </div>
+                            <p id="conv-h-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animation Controls -->
+                <div class="lg:w-1/3 flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-slate-200 pt-4 lg:pt-0 lg:pl-6 gap-3">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Animation Control</label>
+                    
+                    <div class="flex gap-3 justify-center items-center">
+                        <button onclick="resetConv()" class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-800 transition-colors flex justify-center items-center" title="Reset">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button onclick="toggleConvPlay()" id="conv-play-btn" class="w-14 h-14 rounded-full bg-blue-500 text-white hover:bg-blue-600 shadow-md transition-transform hover:scale-105 flex justify-center items-center text-xl">
+                            <i class="fas fa-play ml-1"></i>
+                        </button>
+                    </div>
+
+                    <div class="w-full flex items-center gap-3">
+                        <span class="text-xs font-mono text-slate-500">-10</span>
+                        <input type="range" id="conv-time-slider" min="-10" max="10" step="0.1" value="-10" class="flex-1 accent-blue-500" oninput="manualConvSlide()">
+                        <span class="text-xs font-mono text-slate-500">10</span>
+                    </div>
+                    <div class="text-center font-mono text-sm bg-slate-100 py-1 rounded">
+                        t = <span id="conv-t-display" class="font-bold text-blue-600">-10.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col xl:flex-row gap-4">
+                <div class="glass-panel rounded-xl p-3 flex-1 min-h-[300px] flex flex-col shadow-sm relative">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 px-2 border-b border-slate-100 pb-2">
+                        <i class="fas fa-layer-group text-purple-500 mr-2"></i>Overlap: <span class="text-blue-500 font-mono">x(τ)</span> and <span class="text-red-500 font-mono">h(t-τ)</span>
+                    </h3>
+                    <div id="plot-conv-overlap" class="w-full flex-1"></div>
+                </div>
+                
+                <div class="glass-panel rounded-xl p-3 flex-1 min-h-[300px] flex flex-col shadow-sm relative">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 px-2 border-b border-slate-100 pb-2">
+                        <i class="fas fa-poll text-emerald-500 mr-2"></i>Output: y(t) = ∫ x(τ)h(t-τ)dτ
+                    </h3>
+                    <div class="absolute top-2 right-4 text-sm font-mono bg-emerald-50 text-emerald-700 px-3 py-1 rounded border border-emerald-200 shadow-sm z-10">
+                        y(t) = <span id="conv-y-display" class="font-bold">0.00</span>
+                    </div>
+                    <div id="plot-conv-output" class="w-full flex-1"></div>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // MATH.JS SETUP & CUSTOM FUNCTIONS
+        // ==========================================
+        
+        // Define standard signals for the parser
+        const customScope = {
+            u: (t) => t >= 0 ? 1 : 0,                 // Unit Step
+            r: (t) => t >= 0 ? t : 0,                 // Ramp
+            delta: (t) => Math.abs(t) < 0.05 ? 1 : 0, // Discrete Impulse (width=0.1)
+            rect: (t) => Math.abs(t) <= 0.5 ? 1 : 0,  // Rectangular pulse (width=1)
+            t: 0                                      // Variable
+        };
+
+        // Custom config for Plotly for better aesthetics
+        const plotlyLayoutBase = {
+            font: { family: 'Inter, sans-serif', color: '#475569' },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { l: 40, r: 20, t: 20, b: 40 },
+            xaxis: { gridcolor: '#e2e8f0', zerolinecolor: '#94a3b8', zerolinewidth: 2 },
+            yaxis: { gridcolor: '#e2e8f0', zerolinecolor: '#94a3b8', zerolinewidth: 2 },
+            hovermode: 'closest',
+            showlegend: true,
+            legend: { orientation: 'h', y: 1.1, x: 0 }
+        };
+        const plotlyConfig = { responsive: true, displayModeBar: false };
+
+        // Math.js evaluation helper
+        function compileAndEvaluate(expressionStr, tArray) {
+            try {
+                const node = math.parse(expressionStr);
+                const compiled = node.compile();
+                let yArray = new Float64Array(tArray.length);
+                let scope = { ...customScope };
+                
+                for(let i=0; i<tArray.length; i++) {
+                    scope.t = tArray[i];
+                    yArray[i] = compiled.evaluate(scope);
+                }
+                return { success: true, data: yArray, node: node };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+
+        // ==========================================
+        // TAB 1: FOURIER ANALYSIS LOGIC
+        // ==========================================
+
+        const f_tMin = -10, f_tMax = 10;
+        const f_N = 1000; 
+        const f_dt = (f_tMax - f_tMin) / f_N;
+        const f_tArr = Array.from({length: f_N}, (_, i) => f_tMin + i * f_dt);
+
+        function computeDFT(xArr, dt) {
+            const N = xArr.length;
+            const maxK = Math.floor(N/2); // Up to Nyquist
+            let freqs = new Float64Array(maxK);
+            let mag = new Float64Array(maxK);
+            let phase = new Float64Array(maxK);
+
+            for (let k = 0; k < maxK; k++) {
+                let re = 0, im = 0;
+                for (let n = 0; n < N; n++) {
+                    const angle = (2 * Math.PI * k * n) / N;
+                    re += xArr[n] * Math.cos(angle);
+                    im -= xArr[n] * Math.sin(angle);
+                }
+                
+                // Scale for continuous approximation
+                re *= dt; im *= dt; 
+                
+                let magnitude = Math.sqrt(re*re + im*im);
+                mag[k] = magnitude;
+                
+                // Threshold phase to avoid noise
+                phase[k] = magnitude > 0.05 ? Math.atan2(im, re) * (180 / Math.PI) : 0;
+                freqs[k] = k / (N * dt);
+            }
+            return { freqs, mag, phase };
+        }
+
+        function renderKaTeX(node, elementId) {
+            const el = document.getElementById(elementId);
+            try {
+                // Convert Math.js node to TeX
+                let tex = node.toTex({parenthesis: 'auto'});
+                // Add x(t) = 
+                tex = "x(t) = " + tex;
+                katex.render(tex, el, { throwOnError: false, displayMode: true });
+            } catch (e) {
+                el.innerText = "Error rendering equation";
+            }
+        }
+
+        function handleFourierInputChange() {
+            const inputEl = document.getElementById('fourier-input');
+            const errorEl = document.getElementById('fourier-error');
+            const expr = inputEl.value;
+
+            if(!expr.trim()) return;
+
+            const result = compileAndEvaluate(expr, f_tArr);
+
+            if (result.success) {
+                inputEl.classList.remove('math-input-error');
+                errorEl.classList.add('hidden');
+                
+                // Update Math display
+                renderKaTeX(result.node, 'fourier-math-display');
+                
+                // Update Plots
+                updateFourierPlots(result.data);
+            } else {
+                inputEl.classList.add('math-input-error');
+                errorEl.innerText = result.error;
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function loadFourierPreset() {
+            const select = document.getElementById('fourier-preset');
+            if (select.value === 'custom') return;
+            document.getElementById('fourier-input').value = select.value;
+            handleFourierInputChange();
+        }
+
+        function initFourierPlots() {
+            Plotly.newPlot('plot-fourier-time', [{ x: [], y: [], type: 'scatter', mode: 'lines', line: {color: '#3b82f6', width: 2}, name: 'x(t)' }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude' } }, plotlyConfig);
+            Plotly.newPlot('plot-fourier-mag', [{ x: [], y: [], type: 'scatter', mode: 'lines', fill: 'tozeroy', line: {color: '#10b981', width: 2}, name: '|X(f)|' }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Magnitude' } }, plotlyConfig);
+            Plotly.newPlot('plot-fourier-phase', [{ x: [], y: [], type: 'bar', marker: {color: '#a855f7'}, name: '∠X(f)' }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Phase (Degrees)', range: [-180, 180], dtick: 90 } }, plotlyConfig);
+            
+            handleFourierInputChange();
+        }
+
+        function updateFourierPlots(xData) {
+            Plotly.react('plot-fourier-time', [{
+                x: f_tArr, y: Array.from(xData), type: 'scatter', mode: 'lines', line: {color: '#3b82f6', width: 2}, name: 'x(t)'
+            }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude' } }, plotlyConfig);
+
+            const dft = computeDFT(xData, f_dt);
+            
+            // Limit frequency for better visualization
+            const maxFreqIndex = dft.freqs.findIndex(f => f > 5) || dft.freqs.length;
+            const f_plot = Array.from(dft.freqs.subarray(0, maxFreqIndex));
+            const mag_plot = Array.from(dft.mag.subarray(0, maxFreqIndex));
+            const phase_plot = Array.from(dft.phase.subarray(0, maxFreqIndex));
+
+            Plotly.react('plot-fourier-mag', [{
+                x: f_plot, y: mag_plot, type: 'scatter', mode: 'lines', fill: 'tozeroy', line: {color: '#10b981', width: 2}, name: '|X(f)|'
+            }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Magnitude' } }, plotlyConfig);
+
+            Plotly.react('plot-fourier-phase', [{
+                x: f_plot, y: phase_plot, type: 'bar', marker: {color: '#a855f7'}, name: '∠X(f)'
+            }], { ...plotlyLayoutBase, xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, yaxis: { ...plotlyLayoutBase.yaxis, title: 'Phase (Degrees)', range: [-190, 190], dtick: 90 } }, plotlyConfig);
+        }
+
+
+        // ==========================================
+        // TAB 2: CONVOLUTION ANIMATION LOGIC
+        // ==========================================
+        
+        const c_N = 500;
+        const c_tMin = -10, c_tMax = 10;
+        const c_dt = (c_tMax - c_tMin) / c_N;
+        const c_tauArr = Array.from({length: c_N}, (_, i) => c_tMin + i * c_dt);
+        
+        let c_xData = new Float64Array(c_N);
+        let c_hData = new Float64Array(c_N);
+        let c_yData = new Float64Array(c_N);
+        let c_exprH_compiled = null;
+        
+        let convAnimId = null;
+        let isConvPlaying = false;
+
+        const presetsConv = {
+            'pulse_pulse': { x: 'rect(t/2)', h: 'rect(t/2)' },
+            'exp_step': { x: 'exp(-t)*u(t)', h: 'u(t)' },
+            'step_exp': { x: 'u(t)', h: 'exp(-t)*u(t)' },
+            'sine_pulse': { x: 'sin(pi*t)*(u(t+2)-u(t-2))', h: 'rect(t)' }
+        };
+
+        function loadConvPreset() {
+            const val = document.getElementById('conv-preset').value;
+            if(val === 'custom') return;
+            document.getElementById('conv-x-input').value = presetsConv[val].x;
+            document.getElementById('conv-h-input').value = presetsConv[val].h;
+            handleConvInputChange();
+        }
+
+        function handleConvInputChange() {
+            const xInput = document.getElementById('conv-x-input');
+            const hInput = document.getElementById('conv-h-input');
+            const xErr = document.getElementById('conv-x-error');
+            const hErr = document.getElementById('conv-h-error');
+
+            let success = true;
+
+            // Parse x(t)
+            const resX = compileAndEvaluate(xInput.value, c_tauArr);
+            if (resX.success) {
+                xInput.classList.remove('math-input-error'); xErr.classList.add('hidden');
+                c_xData = resX.data;
+            } else {
+                xInput.classList.add('math-input-error'); xErr.innerText = resX.error; xErr.classList.remove('hidden');
+                success = false;
+            }
+
+            // Parse h(t)
+            const resH = compileAndEvaluate(hInput.value, c_tauArr);
+            if (resH.success) {
+                hInput.classList.remove('math-input-error'); hErr.classList.add('hidden');
+                c_hData = resH.data;
+                try {
+                    c_exprH_compiled = math.compile(hInput.value);
+                } catch(e) { success = false; }
+            } else {
+                hInput.classList.add('math-input-error'); hErr.innerText = resH.error; hErr.classList.remove('hidden');
+                success = false;
+            }
+
+            if(success) {
+                precomputeConvolution();
+                updateConvPlots();
+            }
+        }
+
+        function precomputeConvolution() {
+            c_yData.fill(0);
+            let scope = { ...customScope };
+            
+            for (let i = 0; i < c_N; i++) {
+                let t_val = c_tauArr[i];
+                let sum = 0;
+                
+                for (let j = 0; j < c_N; j++) {
+                    let tau = c_tauArr[j];
+                    scope.t = t_val - tau;
+                    let h_val = c_exprH_compiled.evaluate(scope);
+                    sum += c_xData[j] * h_val * c_dt;
+                }
+                c_yData[i] = sum;
+            }
+        }
+
+        function initConvPlots() {
+            Plotly.newPlot('plot-conv-overlap', [], {
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'τ (tau)', range: [-10, 10] },
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude', range: [-2, 2] }
+            }, plotlyConfig);
+
+            Plotly.newPlot('plot-conv-output', [], {
+                ...plotlyLayoutBase,
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)', range: [-10, 10] },
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Output y(t)', range: [-3, 3] }
+            }, plotlyConfig);
+
+            handleConvInputChange();
+        }
+
+        function updateConvPlots() {
+            const slider = document.getElementById('conv-time-slider');
+            const currentT = parseFloat(slider.value);
+            document.getElementById('conv-t-display').innerText = currentT.toFixed(1);
+
+            // 1. Overlap Plot Data
+            let h_shifted = new Float64Array(c_N);
+            let product = new Float64Array(c_N);
+            let scope = { ...customScope };
+            
+            for(let j=0; j<c_N; j++) {
+                scope.t = currentT - c_tauArr[j];
+                let h_val = c_exprH_compiled.evaluate(scope);
+                h_shifted[j] = h_val;
+                product[j] = c_xData[j] * h_val;
+            }
+
+            const overlapTraces = [
+                { x: c_tauArr, y: Array.from(c_xData), type: 'scatter', mode: 'lines', line: {color: '#3b82f6', width: 2}, name: 'x(τ)' },
+                { x: c_tauArr, y: Array.from(h_shifted), type: 'scatter', mode: 'lines', line: {color: '#ef4444', width: 2, dash: 'dash'}, name: 'h(t-τ)' },
+                { x: c_tauArr, y: Array.from(product), type: 'scatter', mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(16, 185, 129, 0.3)', line: {color: '#10b981', width: 1}, name: 'Product' }
+            ];
+
+            Plotly.react('plot-conv-overlap', overlapTraces, {
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'τ (tau)', range: [-10, 10] },
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude' } // Auto scale Y for better view
+            }, plotlyConfig);
+
+
+            // 2. Output Plot Data up to current T
+            let c_tauArr_plot = Array.from(c_tauArr);
+            let yData_plot = Array.from(c_yData);
+            
+            // Current value indicator
+            let idx = c_tauArr_plot.findIndex(val => val >= currentT);
+            if(idx === -1) idx = c_N - 1;
+            
+            let y_current = c_yData[idx];
+            document.getElementById('conv-y-display').innerText = y_current.toFixed(3);
+
+            // Split into "past" (solid) and "future" (ghost)
+            let y_past = yData_plot.slice(0, idx + 1);
+            let x_past = c_tauArr_plot.slice(0, idx + 1);
+            
+            const outputTraces = [
+                { x: c_tauArr_plot, y: yData_plot, type: 'scatter', mode: 'lines', line: {color: 'rgba(16, 185, 129, 0.2)', width: 2, dash: 'dot'}, name: 'Future Path', showlegend: false },
+                { x: x_past, y: y_past, type: 'scatter', mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(16, 185, 129, 0.2)', line: {color: '#10b981', width: 3}, name: 'y(t)' },
+                { x: [currentT], y: [y_current], type: 'scatter', mode: 'markers', marker: {color: '#10b981', size: 10, line: {color: 'white', width: 2}}, name: 'Current t' }
+            ];
+
+            Plotly.react('plot-conv-output', outputTraces, {
+                ...plotlyLayoutBase,
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)', range: [-10, 10] },
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Output y(t)' } 
+            }, plotlyConfig);
+        }
+
+        function manualConvSlide() {
+            if(isConvPlaying) toggleConvPlay();
+            updateConvPlots();
+        }
+
+        function toggleConvPlay() {
+            const btn = document.getElementById('conv-play-btn');
+            if(isConvPlaying) {
+                isConvPlaying = false;
+                btn.innerHTML = '<i class="fas fa-play ml-1"></i>';
+                btn.classList.replace('bg-orange-500', 'bg-blue-500');
+                btn.classList.replace('hover:bg-orange-600', 'hover:bg-blue-600');
+                cancelAnimationFrame(convAnimId);
+            } else {
+                isConvPlaying = true;
+                btn.innerHTML = '<i class="fas fa-pause"></i>';
+                btn.classList.replace('bg-blue-500', 'bg-orange-500');
+                btn.classList.replace('hover:bg-blue-600', 'hover:bg-orange-600');
+                
+                const slider = document.getElementById('conv-time-slider');
+                if(parseFloat(slider.value) >= parseFloat(slider.max)) {
+                    slider.value = slider.min;
+                }
+                convLoop();
+            }
+        }
+
+        function convLoop() {
+            if(!isConvPlaying) return;
+            
+            const slider = document.getElementById('conv-time-slider');
+            let val = parseFloat(slider.value);
+            let step = parseFloat(slider.step) || 0.1;
+            
+            if(val < parseFloat(slider.max)) {
+                slider.value = (val + step).toFixed(2);
+                updateConvPlots();
+                // ~30fps update for Plotly performance
+                setTimeout(() => {
+                    convAnimId = requestAnimationFrame(convLoop);
+                }, 30); 
+            } else {
+                toggleConvPlay(); // End reached
+            }
+        }
+
+        function resetConv() {
+            if(isConvPlaying) toggleConvPlay();
+            document.getElementById('conv-time-slider').value = -10;
+            updateConvPlots();
+        }
+
+        // Tab Switching
+        function switchTab(tabId) {
+            const btnF = document.getElementById('tab-btn-fourier');
+            const btnC = document.getElementById('tab-btn-conv');
+            const viewF = document.getElementById('tab-fourier');
+            const viewC = document.getElementById('tab-conv');
+
+            if(tabId === 'fourier') {
+                viewF.classList.remove('hidden');
+                viewC.classList.add('hidden');
+                
+                btnF.classList.replace('bg-slate-700', 'bg-blue-500');
+                btnF.classList.replace('text-slate-300', 'text-white');
+                btnF.classList.remove('hover:bg-slate-700');
+                
+                btnC.classList.replace('bg-blue-500', 'bg-transparent');
+                btnC.classList.replace('text-white', 'text-slate-300');
+                btnC.classList.add('hover:bg-slate-700');
+                
+                // Trigger resize for Plotly
+                setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 10);
+            } else {
+                viewC.classList.remove('hidden');
+                viewF.classList.add('hidden');
+                
+                btnC.classList.replace('bg-transparent', 'bg-blue-500');
+                btnC.classList.replace('text-slate-300', 'text-white');
+                btnC.classList.remove('hover:bg-slate-700');
+                
+                btnF.classList.replace('bg-blue-500', 'bg-transparent');
+                btnF.classList.replace('text-white', 'text-slate-300');
+                btnF.classList.add('hover:bg-slate-700');
+
+                setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 10);
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            initFourierPlots();
+            initConvPlots();
+            
+            // Handle window resizing for responsive charts
+            window.addEventListener('resize', () => {
+                if(!document.getElementById('tab-fourier').classList.contains('hidden')) {
+                    Plotly.Plots.resize('plot-fourier-time');
+                    Plotly.Plots.resize('plot-fourier-mag');
+                    Plotly.Plots.resize('plot-fourier-phase');
+                } else {
+                    Plotly.Plots.resize('plot-conv-overlap');
+                    Plotly.Plots.resize('plot-conv-output');
+                }
+            });
+        };
+    </script>
+</body>
+</html>
