@@ -58,7 +58,10 @@
         </div>
         <div class="flex gap-2 bg-slate-800 p-1 rounded-lg">
             <button id="tab-btn-fourier" class="px-5 py-2 rounded-md bg-blue-500 text-white font-semibold transition-all duration-200 shadow-sm" onclick="switchTab('fourier')">
-                <i class="fas fa-chart-line mr-2"></i>Fourier Analysis
+                <i class="fas fa-chart-line mr-2"></i>Fourier Transform
+            </button>
+            <button id="tab-btn-fs" class="px-5 py-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 font-semibold transition-all duration-200" onclick="switchTab('fs')">
+                <i class="fas fa-chart-pie mr-2"></i>Fourier Series
             </button>
             <button id="tab-btn-conv" class="px-5 py-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 font-semibold transition-all duration-200" onclick="switchTab('conv')">
                 <i class="fas fa-layer-group mr-2"></i>Convolution
@@ -228,6 +231,61 @@
             </div>
             
         </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: FOURIER SERIES COMPOSER             -->
+        <!-- ========================================== -->
+        <div id="tab-fs" class="absolute inset-0 w-full h-full flex flex-col md:flex-row p-4 gap-4 hidden overflow-y-auto">
+            
+            <!-- Left Panel: Signal Composer -->
+            <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-4 shrink-0">
+                <div class="glass-panel rounded-xl flex flex-col overflow-hidden shadow-sm h-full flex-1">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800"><i class="fas fa-plus-circle text-orange-500 mr-2"></i>Signal Composer</h2>
+                        <button onclick="addFSInput()" class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 transition-colors font-bold shadow-sm">
+                            <i class="fas fa-plus mr-1"></i> Add Signal
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 flex-1 flex flex-col gap-4 overflow-y-auto">
+                        <div id="fs-inputs-container" class="space-y-3">
+                            <!-- Dynamic inputs injected here via JS -->
+                        </div>
+                        
+                        <div class="border-t border-slate-200 pt-4 mt-2 space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Fundamental Period (T)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="fs-period" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2" value="1" step="0.1" min="0.1" onchange="handleFSChange()">
+                                    <span class="text-xs text-slate-500 font-mono">seconds</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Number of Harmonics (N)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="fs-harmonics" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2" value="10" step="1" min="1" max="50" onchange="handleFSChange()">
+                                    <span class="text-xs text-slate-500 font-mono">terms</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Charts -->
+            <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-4 overflow-y-auto">
+                <div class="glass-panel rounded-xl p-3 flex-1 min-h-[300px] flex flex-col shadow-sm relative">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 px-2"><i class="far fa-clock text-orange-500 mr-2"></i>Composite Time Domain: x(t) = Σ x<sub>i</sub>(t)</h3>
+                    <div id="plot-fs-time" class="w-full flex-1"></div>
+                </div>
+                
+                <div class="glass-panel rounded-xl p-3 flex-1 min-h-[300px] flex flex-col shadow-sm relative">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 px-2"><i class="fas fa-chart-bar text-indigo-500 mr-2"></i>Fourier Series Magnitude Spectrum</h3>
+                    <div id="plot-fs-mag" class="w-full flex-1"></div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script>
@@ -602,47 +660,236 @@
             updateConvPlots();
         }
 
+        // ==========================================
+        // TAB 3: FOURIER SERIES COMPOSER LOGIC
+        // ==========================================
+        let fsInputCount = 0;
+
+        function addFSInput(initialValue = '') {
+            fsInputCount++;
+            const container = document.getElementById('fs-inputs-container');
+            const div = document.createElement('div');
+            div.className = 'relative flex items-center gap-2 group';
+            div.id = `fs-input-group-${fsInputCount}`;
+            
+            div.innerHTML = `
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 font-mono text-xs font-bold">x<sub>${fsInputCount}</sub>=</span>
+                <input type="text" class="fs-signal-input w-full bg-white border border-slate-300 text-slate-900 text-sm font-mono rounded-lg focus:ring-orange-500 focus:border-orange-500 block pl-12 p-2 transition-colors" value="${initialValue}" placeholder="e.g. sin(2*pi*t)" oninput="handleFSChange()">
+                <button onclick="removeFSInput('${div.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-2" title="Remove signal">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            container.appendChild(div);
+            if(initialValue !== '') handleFSChange();
+        }
+
+        function removeFSInput(id) {
+            document.getElementById(id).remove();
+            handleFSChange();
+        }
+
+        function initFSPlots() {
+            Plotly.newPlot('plot-fs-time', [], { 
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)' }, 
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude' } 
+            }, plotlyConfig);
+            
+            Plotly.newPlot('plot-fs-mag', [], { 
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, 
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Magnitude |C_n|', rangemode: 'tozero' } 
+            }, plotlyConfig);
+
+            // Add default signals to demonstrate harmonic separation
+            addFSInput('sin(2*pi*t)');
+            addFSInput('0.5*sin(6*pi*t)');
+        }
+
+        function handleFSChange() {
+            const inputs = document.querySelectorAll('.fs-signal-input');
+            const periodStr = document.getElementById('fs-period').value;
+            const harmonicsStr = document.getElementById('fs-harmonics').value;
+            
+            let T = parseFloat(periodStr) || 1;
+            let N_harmonics = parseInt(harmonicsStr) || 10;
+            if (T <= 0) T = 1;
+            
+            // 1. Parse all valid expressions
+            const validCompiled = [];
+            const expressions = [];
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if(val) {
+                    try {
+                        const compiled = math.compile(val);
+                        // Quick test evaluation
+                        compiled.evaluate({ ...customScope, t: 0 });
+                        validCompiled.push(compiled);
+                        expressions.push(val);
+                        input.classList.remove('math-input-error');
+                    } catch(e) {
+                        input.classList.add('math-input-error');
+                    }
+                }
+            });
+
+            // 2. Compute Time Domain Data
+            const tMin = -T, tMax = 2 * T;
+            const numPoints = 1000;
+            const dt = (tMax - tMin) / numPoints;
+            const tArr = Array.from({length: numPoints}, (_, i) => tMin + i * dt);
+            
+            const individualSignals = validCompiled.map(() => new Float64Array(numPoints));
+            const compositeSignal = new Float64Array(numPoints);
+            
+            let scope = { ...customScope };
+            for(let i = 0; i < numPoints; i++) {
+                scope.t = tArr[i];
+                let sum = 0;
+                for(let j = 0; j < validCompiled.length; j++) {
+                    let val = validCompiled[j].evaluate(scope);
+                    individualSignals[j][i] = val;
+                    sum += val;
+                }
+                compositeSignal[i] = sum;
+            }
+
+            // Time Domain Traces
+            const timeTraces = [];
+            const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899'];
+            
+            individualSignals.forEach((sig, idx) => {
+                timeTraces.push({
+                    x: tArr, y: Array.from(sig), type: 'scatter', mode: 'lines',
+                    line: { color: colors[idx % colors.length], width: 1.5, dash: 'dot' },
+                    opacity: 0.6, name: `x<sub>${idx+1}</sub>(t)`, hoverinfo: 'none'
+                });
+            });
+            
+            if (validCompiled.length > 0) {
+                timeTraces.push({
+                    x: tArr, y: Array.from(compositeSignal), type: 'scatter', mode: 'lines',
+                    line: { color: '#0f172a', width: 3 },
+                    name: 'Sum x(t)'
+                });
+            }
+
+            Plotly.react('plot-fs-time', timeTraces, { 
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Time (t)' }, 
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Amplitude' } 
+            }, plotlyConfig);
+
+
+            // 3. Compute Fourier Series Coefficients (Numerical Integration)
+            if (validCompiled.length === 0) {
+                Plotly.react('plot-fs-mag', [], plotlyLayoutBase, plotlyConfig);
+                return;
+            }
+
+            const int_points = 2000;
+            const dt_int = T / int_points;
+            
+            // Calculate DC component (a0)
+            let a0 = 0;
+            for(let i = 0; i < int_points; i++) {
+                scope.t = i * dt_int;
+                let sum = 0;
+                for(let c of validCompiled) sum += c.evaluate(scope);
+                a0 += sum * dt_int;
+            }
+            a0 = a0 / T;
+
+            const freqs = [0];
+            const mags = [Math.abs(a0)];
+
+            // Calculate AC components (an, bn)
+            for (let n = 1; n <= N_harmonics; n++) {
+                let an = 0, bn = 0;
+                let w = 2 * Math.PI * n / T;
+                
+                for(let i = 0; i < int_points; i++) {
+                    scope.t = i * dt_int;
+                    let val = 0;
+                    for(let c of validCompiled) val += c.evaluate(scope);
+                    
+                    an += val * Math.cos(w * scope.t) * dt_int;
+                    bn += val * Math.sin(w * scope.t) * dt_int;
+                }
+                an *= (2/T);
+                bn *= (2/T);
+                
+                freqs.push(n / T);
+                mags.push(Math.sqrt(an*an + bn*bn)); // Peak amplitude of harmonic
+            }
+
+            // Create Stem Plot for Magnitude using lines and markers
+            const magTraces = [];
+            
+            // Vertical lines for stems
+            for(let i = 0; i < freqs.length; i++) {
+                magTraces.push({
+                    x: [freqs[i], freqs[i]],
+                    y: [0, mags[i]],
+                    mode: 'lines',
+                    line: {color: '#f97316', width: 2},
+                    showlegend: false,
+                    hoverinfo: 'none'
+                });
+            }
+            
+            // Markers on top of stems
+            magTraces.push({
+                x: freqs,
+                y: mags,
+                mode: 'markers',
+                type: 'scatter',
+                marker: { color: '#ea580c', size: 8, line: {color: '#ffffff', width: 1.5} },
+                name: 'Magnitude',
+                hovertemplate: 'Freq: %{x:.2f} Hz<br>Mag: %{y:.3f}<extra></extra>'
+            });
+
+            Plotly.react('plot-fs-mag', magTraces, { 
+                ...plotlyLayoutBase, 
+                xaxis: { ...plotlyLayoutBase.xaxis, title: 'Frequency (Hz)' }, 
+                yaxis: { ...plotlyLayoutBase.yaxis, title: 'Magnitude |C_n|', rangemode: 'tozero' } 
+            }, plotlyConfig);
+        }
+
         // Tab Switching
         function switchTab(tabId) {
-            const btnF = document.getElementById('tab-btn-fourier');
-            const btnC = document.getElementById('tab-btn-conv');
-            const viewF = document.getElementById('tab-fourier');
-            const viewC = document.getElementById('tab-conv');
+            const tabs = ['fourier', 'fs', 'conv'];
+            
+            tabs.forEach(t => {
+                const view = document.getElementById(`tab-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                
+                if (t === tabId) {
+                    view.classList.remove('hidden');
+                    // Set active button styles
+                    btn.classList.replace('text-slate-300', 'text-white');
+                    if(btn.classList.contains('hover:bg-slate-700')) btn.classList.remove('hover:bg-slate-700');
+                    if(btn.classList.contains('bg-transparent')) btn.classList.replace('bg-transparent', 'bg-blue-500');
+                    else btn.classList.add('bg-blue-500');
+                } else {
+                    view.classList.add('hidden');
+                    // Set inactive button styles
+                    btn.classList.replace('text-white', 'text-slate-300');
+                    btn.classList.add('hover:bg-slate-700');
+                    if(btn.classList.contains('bg-blue-500')) btn.classList.replace('bg-blue-500', 'bg-transparent');
+                }
+            });
 
-            if(tabId === 'fourier') {
-                viewF.classList.remove('hidden');
-                viewC.classList.add('hidden');
-                
-                btnF.classList.replace('bg-slate-700', 'bg-blue-500');
-                btnF.classList.replace('text-slate-300', 'text-white');
-                btnF.classList.remove('hover:bg-slate-700');
-                
-                btnC.classList.replace('bg-blue-500', 'bg-transparent');
-                btnC.classList.replace('text-white', 'text-slate-300');
-                btnC.classList.add('hover:bg-slate-700');
-                
-                // Trigger resize for Plotly
-                setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 10);
-            } else {
-                viewC.classList.remove('hidden');
-                viewF.classList.add('hidden');
-                
-                btnC.classList.replace('bg-transparent', 'bg-blue-500');
-                btnC.classList.replace('text-slate-300', 'text-white');
-                btnC.classList.remove('hover:bg-slate-700');
-                
-                btnF.classList.replace('bg-blue-500', 'bg-transparent');
-                btnF.classList.replace('text-white', 'text-slate-300');
-                btnF.classList.add('hover:bg-slate-700');
-
-                setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 10);
-            }
+            // Trigger resize to fix Plotly layout anomalies in hidden divs
+            setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 10);
         }
 
         // Initialize on load
         window.onload = function() {
             initFourierPlots();
             initConvPlots();
+            initFSPlots();
             
             // Handle window resizing for responsive charts
             window.addEventListener('resize', () => {
@@ -650,6 +897,9 @@
                     Plotly.Plots.resize('plot-fourier-time');
                     Plotly.Plots.resize('plot-fourier-mag');
                     Plotly.Plots.resize('plot-fourier-phase');
+                } else if(!document.getElementById('tab-fs').classList.contains('hidden')) {
+                    Plotly.Plots.resize('plot-fs-time');
+                    Plotly.Plots.resize('plot-fs-mag');
                 } else {
                     Plotly.Plots.resize('plot-conv-overlap');
                     Plotly.Plots.resize('plot-conv-output');
